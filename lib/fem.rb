@@ -35,7 +35,7 @@ class FEM
 			@inotify.each_event do |event|
 				mydir = wd2dir(event.wd)
 				file = [ mydir, event.name ].join('/')
-				if @callbacks.include?(file)
+				if @callbacks.include?(file) and is_watched?(file)
 					id = file2id(file)
 					@callbacks[file].call(id, file, event.mask)
 				end
@@ -115,6 +115,15 @@ class FEM
 		dir, filename = File.split(file)
 		raise StandardError, "File #{file} is not watched" if ! @dirs.include?(dir) or ! @dirs[dir].include?(filename)
 		@ids[file]
+	end
+
+	# Is this file watched?
+	#
+	# file:: file in question
+	def is_watched?(file)
+		dir, filename = File.split(file)
+	  return true if @dirs.include?(dir) and @dirs[dir].include?(filename)
+		return false
 	end
 
 	private
