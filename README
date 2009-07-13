@@ -1,0 +1,13 @@
+FEM - File Event Monitor
+------------------------
+
+This is just a more elaborate interface on top of inotify (using
+Ruby-Inotify[1]) with the purpose of monitoring files in the same way
+monitoring directories (not removing the watch everytime a file deletes
+itself).
+
+We're not monitoring directories (for that you can always use Inotify
+directly). As a bonus, you can define a persist_file so ids are
+persisted to a file (we don't persist anything else, though).
+
+

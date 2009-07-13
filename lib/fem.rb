@@ -1,11 +1,28 @@
+# fem.rb
+#
+# Monitor FILES for modification using Inotify
+# Copyright (c) 2009 by Pablo Lorenzoni <pablo@propus.com.br>
+# Released under the following terms:
+#
+# ----------------------------------------------------------------------
+# "THE BEER-WARE LICENSE" (Revision 43):
+# <pablo@propus.com.br> wrote this file and it's provided AS-IS, no
+# warranties. As long as you retain this notice you can do whatever you
+# want with this stuff. If we meet some day, and you think this stuff is
+# worth it, you can buy me a beer in return."
+# ----------------------------------------------------------------------
+
 require 'inotify'
 
-class FSEM
+class FEM
 
+	# Initialize a new FEM object.
+	#
+	# persist_file:: if passed, we'll persist FEM ids in it.
 	def initialize(persist_file = nil)
 		@persist_file = persist_file						# This will only persist ids
-		if ! @persist_file.nil?
-			@ids     = Hash.new										# This will hold file => id
+		@ids          = Hash.new								# This will hold file => id
+		if ! @persist_file.nil?									# Got a persist_file? Load it!
 			pload
 		end
 
@@ -26,6 +43,7 @@ class FSEM
 		end
 	end
 
+	# Start watching a file. Returns the FEM id of it.
 	def watch(file)
 		dir, filename = File.split(file)
 		if @dirs.include?(dir)
@@ -43,8 +61,10 @@ class FSEM
 			@ids[file] = get_next_id unless @ids.include?(file)
 			psave
 		end
+		return @ids[file]
 	end
 
+	# Stop watching a file.
 	def unwatch(file)
 		dir, filename = File.split(file)
 		if @dirs.include?(dir) and @dirs[dir].include?(filename)
@@ -57,8 +77,13 @@ class FSEM
 		else
 			raise StandardError, "File #{file} is not watched"
 		end
+		return file
 	end
 
+	# Add a new callback for when some event happens with that file. Only one callback is allowed per watched file.
+	#
+	# file:: the file being watched.
+	# block:: the callback. You can assume we'll pass 3 parameters: FEM id, file and event mask for this callback.
 	def add_callback(file, &block)
 		dir, filename = File.split(file)
 		if ! @dirs.include?(dir) or ! @dirs[dir].include?(filename)
@@ -72,6 +97,9 @@ class FSEM
 		end
 	end
 
+	# Remove a callback for a file.
+	#
+	# file:: the file being watched.
 	def rm_callback(file)
 		if @callbacks.include?(file)
 			@callbacks.delete(file)
@@ -80,18 +108,27 @@ class FSEM
 		end
 	end
 
-	private
-
+	# Retrieve the FEM id of a file.
+	#
+	# file:: file being watched.
 	def file2id(file)
+		dir, filename = File.split(file)
+		raise StandardError, "File #{file} is not watched" if ! @dirs.include?(dir) or ! @dirs[dir].include?(filename)
 		@ids[file]
 	end
 
+	private
+
+	# Retrieve the directory given an Inotify Watch Descriptor.
+	#
+	# n:: the watch descriptor
 	def wd2dir(n)
 		arr = @wds.find { |dir, wd| wd == n }
 		return nil if arr.empty?
 		return arr[0]
 	end
 
+	# Persist FEM ids.
 	def psave
 		return nil if @persist_file.nil?
 
@@ -101,6 +138,7 @@ class FSEM
 		end
 	end
 
+	# Load FEM ids.
 	def pload
 		return nil if @persist_file.nil? or ! File.exists?(@persist_file)
 
@@ -110,6 +148,7 @@ class FSEM
 		end
 	end
 
+	# Get the next FEM id. This is just an always-increment numer.
 	def get_next_id
 		@counter ||= 0
 		@counter += 1
