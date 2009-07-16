@@ -12,7 +12,9 @@
 # worth it, you can buy me a beer in return."
 # ----------------------------------------------------------------------
 
+$: << File.dirname(__FILE__)
 require 'inotify'
+require 'timed_buffer'
 
 class FEM
 
@@ -30,6 +32,7 @@ class FEM
 		@dirs      = Hash.new										# This will hold dir => [filename, filename]
 		@wds       = Hash.new										# This will hold dir => wd
 		@callbacks = Hash.new										# This will hold file => block
+		@evbuffer  = Hash.new										# This will hold file => timed_buffer
 
 		@thread = Thread.new do
 			@inotify.each_event do |event|
@@ -37,7 +40,7 @@ class FEM
 				file = [ mydir, event.name ].join('/')
 				if @callbacks.include?(file) and is_watched?(file)
 					id = file2id(file)
-					@callbacks[file].call(id, file, event.mask)
+					@callbacks[file].call(id, file, event.mask) if @evbuffer[file].push(event.mask)
 				end
 			end
 		end
@@ -52,6 +55,7 @@ class FEM
 			else
 				@dirs[dir] << filename
 				@ids[file] = get_next_id unless @ids.include?(file)
+				@evbuffer[file] = TimedBuffer.new
 				psave
 			end
 		else
@@ -59,6 +63,7 @@ class FEM
 			@dirs[dir] = [filename]
 			@wds[dir]  = wd
 			@ids[file] = get_next_id unless @ids.include?(file)
+			@evbuffer[file] = TimedBuffer.new
 			psave
 		end
 		return @ids[file]
@@ -66,9 +71,10 @@ class FEM
 
 	# Stop watching a file.
 	def unwatch(file)
-		dir, filename = File.split(file)
-		if @dirs.include?(dir) and @dirs[dir].include?(filename)
+		if is_watched?(file)
+			dir, filename = File.split(file)
 			@dirs[dir].delete(filename)
+			@evbuffer.delete(file)
 			if @dirs[dir].empty?
 				@inotify.rm_watch(@wds[dir])
 				@dirs.delete(dir)
